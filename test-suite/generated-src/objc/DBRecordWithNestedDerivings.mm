@@ -60,4 +60,9 @@
     return NSOrderedSame;
 }
 
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"<%@ %p key:%@ rec:%@>", self.class, (void *)self, @(self.key), self.rec];
+}
+
 @end

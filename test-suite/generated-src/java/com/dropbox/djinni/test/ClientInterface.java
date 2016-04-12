@@ -6,6 +6,7 @@ package com.dropbox.djinni.test;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
+/** Client interface */
 public abstract class ClientInterface {
     /** Returns record of given string */
     @Nonnull
@@ -15,4 +16,10 @@ public abstract class ClientInterface {
 
     @Nonnull
     public abstract String returnStr();
+
+    @Nonnull
+    public abstract String methTakingInterface(@CheckForNull ClientInterface i);
+
+    @Nonnull
+    public abstract String methTakingOptionalInterface(@CheckForNull ClientInterface i);
 }

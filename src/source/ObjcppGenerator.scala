@@ -16,15 +16,14 @@
 
 package djinni
 
-import djinni.ast.Record.DerivingType
+import java.io.StringWriter
+
 import djinni.ast._
 import djinni.generatorTools._
 import djinni.meta._
-import djinni.syntax.Error
 import djinni.writer.IndentWriter
 
 import scala.collection.mutable
-import scala.collection.parallel.immutable
 
 class ObjcppGenerator(spec: Spec) extends Generator(spec) {
 
@@ -39,7 +38,7 @@ class ObjcppGenerator(spec: Spec) extends Generator(spec) {
     def find(ty: TypeRef) { find(ty.resolved) }
     def find(tm: MExpr) {
       tm.args.foreach(find)
-      find(tm.base) 
+      find(tm.base)
     }
     def find(m: Meta) = for(r <- objcppMarshal.references(m)) r match {
       case ImportRef(arg) => body.add("#import " + arg)
@@ -55,6 +54,8 @@ class ObjcppGenerator(spec: Spec) extends Generator(spec) {
 
   def headerName(ident: String): String = idObjc.ty(ident) + "." + spec.objcHeaderExt
   def privateBodyName(ident: String): String = idObjc.ty(ident) + "+Private." + spec.objcppExt
+
+  def nnCheck(expr: String): String = spec.cppNnCheckExpression.fold(expr)(check => s"$check($expr)")
 
   override def generateInterface(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], i: Interface) {
     val refs = new ObjcRefs()
@@ -73,6 +74,11 @@ class ObjcppGenerator(spec: Spec) extends Generator(spec) {
     refs.privHeader.add("!#include " + q(spec.objcppIncludeCppPrefix + spec.cppFileIdentStyle(ident) + "." + spec.cppHeaderExt))
     refs.body.add("!#import " + q(spec.objcppIncludeObjcPrefix + headerName(ident)))
 
+    spec.cppNnHeader match {
+      case Some(nnHdr) => refs.privHeader.add("#include " + nnHdr)
+      case _ =>
+    }
+
     def writeObjcFuncDecl(method: Interface.Method, w: IndentWriter) {
       val label = if (method.static) "+" else "-"
       val ret = objcMarshal.fqReturnType(method.ret)
@@ -90,13 +96,21 @@ class ObjcppGenerator(spec: Spec) extends Generator(spec) {
       wrapNamespace(w, spec.objcppNamespace, w => {
         w.wl(s"class $helperClass").bracedSemi {
           w.wlOutdent("public:")
-          w.wl(s"using CppType = std::shared_ptr<$cppSelf>;")
+          spec.cppNnType match {
+            case Some(nnPtr) =>
+              w.wl(s"using CppType = ${nnPtr}<$cppSelf>;")
+              w.wl(s"using CppOptType = std::shared_ptr<$cppSelf>;")
+            case _ =>
+              w.wl(s"using CppType = std::shared_ptr<$cppSelf>;")
+              w.wl(s"using CppOptType = std::shared_ptr<$cppSelf>;")
+          }
           w.wl("using ObjcType = " + (if(i.ext.objc) s"id<$self>" else s"$self*") + ";");
           w.wl
           w.wl(s"using Boxed = $helperClass;")
           w.wl
           w.wl(s"static CppType toCpp(ObjcType objc);")
-          w.wl(s"static ObjcType fromCpp(const CppType& cpp);")
+          w.wl(s"static ObjcType fromCppOpt(const CppOptType& cpp);")
+          w.wl(s"static ObjcType fromCpp(const CppType& cpp) { return fromCppOpt(cpp); }")
           w.wl
           w.wlOutdent("private:")
           w.wl("class ObjcProxy;")
@@ -130,18 +144,18 @@ class ObjcppGenerator(spec: Spec) extends Generator(spec) {
         else
           w.wl(s"@interface $objcSelf ()")
         w.wl
-        w.wl(s"@property (nonatomic, readonly) ::djinni::DbxCppWrapperCache<$cppSelf>::Handle cppRef;")
-        w.wl
         w.wl(s"- (id)initWithCpp:(const std::shared_ptr<$cppSelf>&)cppRef;")
         w.wl
         w.wl("@end")
         w.wl
-        w.wl(s"@implementation $objcSelf")
+        w.wl(s"@implementation $objcSelf {")
+        w.wl(s"    ::djinni::CppProxyCache::Handle<std::shared_ptr<$cppSelf>> _cppRefHandle;")
+        w.wl("}")
         w.wl
         w.wl(s"- (id)initWithCpp:(const std::shared_ptr<$cppSelf>&)cppRef")
         w.braced {
           w.w("if (self = [super init])").braced {
-            w.wl("_cppRef.assign(cppRef);")
+            w.wl("_cppRefHandle.assign(cppRef);")
           }
           w.wl("return self;")
         }
@@ -150,25 +164,36 @@ class ObjcppGenerator(spec: Spec) extends Generator(spec) {
           writeObjcFuncDecl(m, w)
           w.braced {
             w.w("try").bracedEnd(" DJINNI_TRANSLATE_EXCEPTIONS()") {
+              m.params.foreach(p => {
+                if (isInterface(p.ty.resolved) && spec.cppNnCheckExpression.nonEmpty) {
+                  // We have a non-optional interface, assert that we're getting a non-null value
+                  val paramName = idObjc.local(p.ident)
+                  val stringWriter = new StringWriter()
+                  writeObjcFuncDecl(m, new IndentWriter(stringWriter))
+                  val singleLineFunctionDecl = stringWriter.toString.replaceAll("\n *", " ")
+                  val exceptionReason = s"Got unexpected null parameter '$paramName' to function $objcSelf $singleLineFunctionDecl"
+                  w.w(s"if ($paramName == nil)").braced {
+                    w.wl(s"""throw std::invalid_argument("$exceptionReason");""")
+                  }
+                }
+              })
               val ret = m.ret.fold("")(_ => "auto r = ")
-              val call = ret + (if (!m.static) "_cppRef.get()->" else cppSelf + "::") + idCpp.method(m.ident) + "("
+              val call = ret + (if (!m.static) "_cppRefHandle.get()->" else cppSelf + "::") + idCpp.method(m.ident) + "("
               writeAlignedCall(w, call, m.params, ")", p => objcppMarshal.toCpp(p.ty, idObjc.local(p.ident.name)))
+
               w.wl(";")
               m.ret.fold()(r => w.wl(s"return ${objcppMarshal.fromCpp(r, "r")};"))
             }
           }
         }
-        w.wl
-        w.wl("@end")
       }
 
       if (i.ext.objc) {
         w.wl
-        val objcExtSelf = objcppMarshal.helperClass("objc_proxy")
         wrapNamespace(w, spec.objcppNamespace, w => {
           w.wl(s"class $helperClass::ObjcProxy final")
           w.wl(s": public $cppSelf")
-          w.wl(s", public ::djinni::DbxObjcWrapperCache<ObjcProxy>::Handle") // Use base class to avoid name conflicts with user-defined methods having the same name as this new data member
+          w.wl(s", public ::djinni::ObjcProxyCache::Handle<ObjcType>") // Use base class to avoid name conflicts with user-defined methods having the same name as this new data member
           w.bracedSemi {
             w.wlOutdent("public:")
             w.wl("using Handle::Handle;")
@@ -178,10 +203,23 @@ class ObjcppGenerator(spec: Spec) extends Generator(spec) {
               w.wl(s"$ret ${idCpp.method(m.ident)}${params.mkString("(", ", ", ")")} override").braced {
                 w.w("@autoreleasepool").braced {
                   val ret = m.ret.fold("")(_ => "auto r = ")
-                  val call = s"[(ObjcType)Handle::get() ${idObjc.method(m.ident)}"
+                  val call = s"[Handle::get() ${idObjc.method(m.ident)}"
                   writeAlignedObjcCall(w, ret + call, m.params, "]", p => (idObjc.field(p.ident), s"(${objcppMarshal.fromCpp(p.ty, "c_" + idCpp.local(p.ident))})"))
                   w.wl(";")
-                  m.ret.fold()(r => { w.wl(s"return ${objcppMarshal.toCpp(r, "r")};") })
+                  m.ret.fold()(ty => {
+                    if (spec.cppNnCheckExpression.nonEmpty && isInterface(ty.resolved)) {
+                      // We have a non-optional interface, so assert that we're getting a non-null value
+                      // before putting it into a non-null pointer
+                      val stringWriter = new StringWriter()
+                      writeObjcFuncDecl(m, new IndentWriter(stringWriter))
+                      val singleLineFunctionDecl = stringWriter.toString.replaceAll("\n *", " ")
+                      val exceptionReason = s"Got unexpected null return value from function $objcSelf $singleLineFunctionDecl"
+                      w.w(s"if (r == nil)").braced {
+                        w.wl(s"""throw std::invalid_argument("$exceptionReason");""")
+                      }
+                    }
+                    w.wl(s"return ${objcppMarshal.toCpp(ty, "r")};")
+                  })
                 }
               }
             }
@@ -195,26 +233,32 @@ class ObjcppGenerator(spec: Spec) extends Generator(spec) {
         w.wl(s"auto $helperClass::toCpp(ObjcType objc) -> CppType").braced {
           // Handle null
           w.w("if (!objc)").braced {
-            w.wl("return nullptr;")
+            if (spec.cppNnType.isEmpty) {
+              w.wl("return nullptr;")
+            } else {
+              w.wl(s"""throw std::invalid_argument("$helperClass::toCpp requires non-nil object");""")
+            }
           }
           if (i.ext.cpp && !i.ext.objc) {
             // C++ only. In this case we generate a class instead of a protocol, so
             // we don't have to do any casting at all, just access cppRef directly.
-            w.wl(s"return objc.cppRef.get();")
+            w.wl("return " + nnCheck("objc->_cppRefHandle.get()") + ";")
+            //w.wl(s"return ${spec.cppNnCheckExpression.getOrElse("")}(objc->_cppRefHandle.get());")
           } else {
             // ObjC only, or ObjC and C++.
-            val objcExtSelf = objcppMarshal.helperClass("objc_proxy")
             if (i.ext.cpp) {
               // If it could be implemented in C++, we might have to unwrap a proxy object.
               w.w(s"if ([(id)objc isKindOfClass:[$objcSelf class]])").braced {
-                w.wl(s"return (($objcSelf*)objc).cppRef.get();")
+                val getProxyExpr = s"(($objcSelf*)objc)->_cppRefHandle.get()"
+                w.wl(s"return ${nnCheck(getProxyExpr)};")
               }
             }
-            w.wl(s"return ::djinni::DbxObjcWrapperCache<$objcExtSelf>::getInstance()->get(objc);")
+            val getProxyExpr = s"::djinni::get_objc_proxy<ObjcProxy>(objc)"
+            w.wl(s"return ${nnCheck(getProxyExpr)};")
           }
         }
         w.wl
-        w.wl(s"auto $helperClass::fromCpp(const CppType& cpp) -> ObjcType").braced {
+        w.wl(s"auto $helperClass::fromCppOpt(const CppOptType& cpp) -> ObjcType").braced {
           // Handle null
           w.w("if (!cpp)").braced {
             w.wl("return nil;")
@@ -222,23 +266,24 @@ class ObjcppGenerator(spec: Spec) extends Generator(spec) {
           if (i.ext.objc && !i.ext.cpp) {
             // ObjC only. In this case we *must* unwrap a proxy object - the dynamic_cast will
             // throw bad_cast if we gave it something of the wrong type.
-            val objcExtSelf = objcppMarshal.helperClass("objc_proxy")
-            w.wl(s"return dynamic_cast<$objcExtSelf&>(*cpp).Handle::get();")
+            w.wl(s"return dynamic_cast<ObjcProxy&>(*cpp).Handle::get();")
           } else {
             // C++ only, or C++ and ObjC.
             if (i.ext.objc) {
               // If it could be implemented in ObjC, we might have to unwrap a proxy object.
-              val objcExtSelf = objcppMarshal.helperClass("objc_proxy")
-              w.w(s"if (auto cppPtr = dynamic_cast<${objcExtSelf}*>(cpp.get()))").braced {
+              w.w(s"if (auto cppPtr = dynamic_cast<ObjcProxy*>(cpp.get()))").braced {
                 w.wl("return cppPtr->Handle::get();")
               }
             }
-            w.w(s"return ::djinni::DbxCppWrapperCache<$cppSelf>::getInstance()->get(cpp, [] (const CppType& p)").bracedEnd(");") {
-              w.wl(s"return [[$objcSelf alloc] initWithCpp:p];")
-            }
+            w.wl(s"return ::djinni::get_cpp_proxy<$objcSelf>(cpp);")
           }
         }
       })
+
+      if (i.ext.cpp) {
+        w.wl
+        w.wl("@end")
+      }
     })
   }
 
@@ -253,9 +298,9 @@ class ObjcppGenerator(spec: Spec) extends Generator(spec) {
     val noBaseSelf = objcMarshal.typename(ident, r) // Used for constant names
     val cppSelf = cppMarshal.fqTypename(ident, r)
 
-    refs.privHeader.add("!#import " + q(spec.objcppIncludeObjcPrefix + (if(r.ext.objc) "../" else "") + headerName(ident)))
-    refs.privHeader.add("!#include " + q(spec.objcppIncludeCppPrefix + (if(r.ext.cpp) "../" else "") + spec.cppFileIdentStyle(ident) + "." + spec.cppHeaderExt))
-    
+    refs.privHeader.add("!#import " + q((if(r.ext.objc) spec.objcExtendedRecordIncludePrefix else spec.objcppIncludeObjcPrefix) + headerName(ident)))
+    refs.privHeader.add("!#include " + q((if(r.ext.cpp) spec.cppExtendedRecordIncludePrefix else spec.objcppIncludeCppPrefix) + spec.cppFileIdentStyle(ident) + "." + spec.cppHeaderExt))
+
     refs.body.add("#include <cassert>")
     refs.body.add("!#import " + q(spec.objcppIncludePrefix + objcppMarshal.privateHeaderName(objcName)))
 
@@ -277,7 +322,7 @@ class ObjcppGenerator(spec: Spec) extends Generator(spec) {
         w.wl(s"struct $helperClass")
         w.bracedSemi {
           w.wl(s"using CppType = $cppSelf;")
-          w.wl(s"using ObjcType = $noBaseSelf*;");
+          w.wl(s"using ObjcType = $noBaseSelf*;")
           w.wl
           w.wl(s"using Boxed = $helperClass;")
           w.wl

@@ -66,8 +66,9 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
   def generateJavaConstants(w: IndentWriter, consts: Seq[Const]) = {
 
     def writeJavaConst(w: IndentWriter, ty: TypeRef, v: Any): Unit = v match {
+      case l: Long if marshal.fieldType(ty).equalsIgnoreCase("long") => w.w(l.toString + "l")
       case l: Long => w.w(l.toString)
-      case d: Double if marshal.fieldType(ty) == "float" => w.w(d.toString + "f")
+      case d: Double if marshal.fieldType(ty).equalsIgnoreCase("float") => w.w(d.toString + "f")
       case d: Double => w.w(d.toString)
       case b: Boolean => w.w(if (b) "true" else "false")
       case s: String => w.w(s)
@@ -187,7 +188,7 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
               w.wl("super.finalize();")
             }
             for (m <- i.methods if !m.static) { // Static methods not in CppProxy
-            val ret = marshal.returnType(m.ret)
+              val ret = marshal.returnType(m.ret)
               val returnStmt = m.ret.fold("")(_ => "return ")
               val params = m.params.map(p => marshal.paramType(p.ty) + " " + idJava.local(p.ident)).mkString(", ")
               val args = m.params.map(p => idJava.local(p.ident)).mkString(", ")
@@ -210,7 +211,9 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
     val refs = new JavaRefs()
     r.fields.foreach(f => refs.find(f.ty))
 
-    val (javaName, javaFinal) = if (r.ext.java) (ident.name + "_base", "") else (ident.name, " final")
+    val javaName = if (r.ext.java) (ident.name + "_base") else ident.name
+    val javaFinal = if (!r.ext.java && spec.javaUseFinalForRecord) " final" else ""
+
     writeJavaFile(javaName, origin, refs.java, w => {
       writeDoc(w, doc)
       javaAnnotationHeader.foreach(w.wl)
@@ -339,6 +342,21 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
           }
 
         }
+
+        w.wl
+        w.wl("@Override")
+        w.w("public String toString()").braced {
+          w.w(s"return ").nestedN(2) {
+            w.wl(s""""${self}{" +""")
+            for (i <- 0 to r.fields.length-1) {
+              val name = idJava.field(r.fields(i).ident)
+              val comma = if (i > 0) """"," + """ else ""
+              w.wl(s"""${comma}"${name}=" + ${name} +""")
+            }
+          }
+          w.wl(s""""}";""")
+        }
+        w.wl
 
         if (r.derivingTypes.contains(DerivingType.Ord)) {
           def primitiveCompare(ident: Ident) {

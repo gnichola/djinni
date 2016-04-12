@@ -6,7 +6,7 @@ package com.dropbox.djinni.test;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
-public final class DateRecord implements Comparable<DateRecord> {
+public class DateRecord implements Comparable<DateRecord> {
 
 
     /*package*/ final java.util.Date mCreatedAt;
@@ -37,6 +37,14 @@ public final class DateRecord implements Comparable<DateRecord> {
         hashCode = hashCode * 31 + (mCreatedAt.hashCode());
         return hashCode;
     }
+
+    @Override
+    public String toString() {
+        return "DateRecord{" +
+                "mCreatedAt=" + mCreatedAt +
+        "}";
+    }
+
 
     @Override
     public int compareTo(@Nonnull DateRecord other)  {

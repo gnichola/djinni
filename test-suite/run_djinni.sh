@@ -64,12 +64,15 @@ fi
     --java-package $java_package \
     --java-nullable-annotation "javax.annotation.CheckForNull" \
     --java-nonnull-annotation "javax.annotation.Nonnull" \
+    --java-use-final-for-record false \
     --ident-java-field mFooBar \
     \
     --cpp-out "$temp_out_relative/cpp" \
+    --cpp-namespace testsuite \
     --ident-cpp-enum-type foo_bar \
     --cpp-optional-template "std::experimental::optional" \
     --cpp-optional-header "<experimental/optional>" \
+    --cpp-extended-record-include-prefix "../../handwritten-src/cpp/" \
     \
     --jni-out "$temp_out_relative/jni" \
     --ident-jni-class NativeFooBar \

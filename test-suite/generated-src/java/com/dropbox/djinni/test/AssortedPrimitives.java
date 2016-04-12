@@ -6,7 +6,7 @@ package com.dropbox.djinni.test;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
-public final class AssortedPrimitives {
+public class AssortedPrimitives {
 
 
     /*package*/ final boolean mB;
@@ -173,4 +173,25 @@ public final class AssortedPrimitives {
         hashCode = hashCode * 31 + (mOFsixtyfour == null ? 0 : mOFsixtyfour.hashCode());
         return hashCode;
     }
+
+    @Override
+    public String toString() {
+        return "AssortedPrimitives{" +
+                "mB=" + mB +
+                "," + "mEight=" + mEight +
+                "," + "mSixteen=" + mSixteen +
+                "," + "mThirtytwo=" + mThirtytwo +
+                "," + "mSixtyfour=" + mSixtyfour +
+                "," + "mFthirtytwo=" + mFthirtytwo +
+                "," + "mFsixtyfour=" + mFsixtyfour +
+                "," + "mOB=" + mOB +
+                "," + "mOEight=" + mOEight +
+                "," + "mOSixteen=" + mOSixteen +
+                "," + "mOThirtytwo=" + mOThirtytwo +
+                "," + "mOSixtyfour=" + mOSixtyfour +
+                "," + "mOFthirtytwo=" + mOFthirtytwo +
+                "," + "mOFsixtyfour=" + mOFsixtyfour +
+        "}";
+    }
+
 }

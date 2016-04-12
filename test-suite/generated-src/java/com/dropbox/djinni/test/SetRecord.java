@@ -7,7 +7,7 @@ import java.util.HashSet;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
-public final class SetRecord {
+public class SetRecord {
 
 
     /*package*/ final HashSet<String> mSet;
@@ -30,4 +30,13 @@ public final class SetRecord {
     public HashSet<Integer> getIset() {
         return mIset;
     }
+
+    @Override
+    public String toString() {
+        return "SetRecord{" +
+                "mSet=" + mSet +
+                "," + "mIset=" + mIset +
+        "}";
+    }
+
 }

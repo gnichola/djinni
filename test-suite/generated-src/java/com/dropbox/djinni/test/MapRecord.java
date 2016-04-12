@@ -7,7 +7,7 @@ import java.util.HashMap;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
-public final class MapRecord {
+public class MapRecord {
 
 
     /*package*/ final HashMap<String, Long> mMap;
@@ -30,4 +30,13 @@ public final class MapRecord {
     public HashMap<Integer, Integer> getImap() {
         return mImap;
     }
+
+    @Override
+    public String toString() {
+        return "MapRecord{" +
+                "mMap=" + mMap +
+                "," + "mImap=" + mImap +
+        "}";
+    }
+
 }

@@ -3,13 +3,18 @@
 
 #pragma once
 
+#include "constant_record.hpp"
 #include <cstdint>
 #include <experimental/optional>
 #include <string>
 #include <utility>
 
+namespace testsuite {
+
+/** Record containing constants */
 struct Constants final {
 
+    /** bool_constant has documentation. */
     static bool const BOOL_CONSTANT;
 
     static int8_t const I8_CONSTANT;
@@ -22,19 +27,45 @@ struct Constants final {
 
     static float const F32_CONSTANT;
 
+    /**
+     * f64_constant has long documentation.
+     * (Second line of multi-line documentation.
+     *   Indented third line of multi-line documentation.)
+     */
     static double const F64_CONSTANT;
+
+    static std::experimental::optional<bool> const OPT_BOOL_CONSTANT;
+
+    static std::experimental::optional<int8_t> const OPT_I8_CONSTANT;
+
+    /** opt_i16_constant has documentation. */
+    static std::experimental::optional<int16_t> const OPT_I16_CONSTANT;
+
+    static std::experimental::optional<int32_t> const OPT_I32_CONSTANT;
+
+    static std::experimental::optional<int64_t> const OPT_I64_CONSTANT;
+
+    /**
+     * opt_f32_constant has long documentation.
+     * (Second line of multi-line documentation.
+     *   Indented third line of multi-line documentation.)
+     */
+    static std::experimental::optional<float> const OPT_F32_CONSTANT;
+
+    static std::experimental::optional<double> const OPT_F64_CONSTANT;
 
     static std::string const STRING_CONSTANT;
 
-    static std::experimental::optional<int32_t> const OPTIONAL_INTEGER_CONSTANT;
+    static std::experimental::optional<std::string> const OPT_STRING_CONSTANT;
 
-    static Constants const OBJECT_CONSTANT;
-    int32_t some_integer;
-    std::string some_string;
+    static ConstantRecord const OBJECT_CONSTANT;
 
-    Constants(int32_t some_integer,
-              std::string some_string)
-    : some_integer(std::move(some_integer))
-    , some_string(std::move(some_string))
-    {}
+    /**
+     * No support for null optional constants
+     * No support for optional constant records
+     * No support for constant binary, list, set, map
+     */
+    static bool const DUMMY;
 };
+
+}  // namespace testsuite

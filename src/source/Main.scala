@@ -27,16 +27,21 @@ object Main {
     var cppOutFolder: Option[File] = None
     var cppNamespace: String = ""
     var cppIncludePrefix: String = ""
+    var cppExtendedRecordIncludePrefix: String = ""
     var cppFileIdentStyle: IdentConverter = IdentStyle.underLower
     var cppOptionalTemplate: String = "std::optional"
     var cppOptionalHeader: String = "<optional>"
     var cppEnumHashWorkaround : Boolean = true
+    var cppNnHeader: Option[String] = None
+    var cppNnType: Option[String] = None
+    var cppNnCheckExpression: Option[String] = None
     var javaOutFolder: Option[File] = None
     var javaPackage: Option[String] = None
     var javaCppException: Option[String] = None
     var javaAnnotation: Option[String] = None
     var javaNullableAnnotation: Option[String] = None
     var javaNonnullAnnotation: Option[String] = None
+    var javaUseFinalForRecord: Boolean = true
     var jniOutFolder: Option[File] = None
     var jniHeaderOutFolderOptional: Option[File] = None
     var jniNamespace: String = "djinni_generated"
@@ -59,6 +64,7 @@ object Main {
     var objcIdentStyle = IdentStyle.objcDefault
     var objcTypePrefix: String = ""
     var objcIncludePrefix: String = ""
+    var objcExtendedRecordIncludePrefix: String = ""
     var objcppIncludePrefix: String = ""
     var objcppIncludeCppPrefix: String = ""
     var objcppIncludeObjcPrefixOptional: Option[String] = None
@@ -88,7 +94,7 @@ object Main {
     var yamlOutFolder: Option[File] = None
     var yamlOutFile: Option[String] = None
     var yamlPrefix: String = ""
-
+	
     val argParser = new scopt.OptionParser[Unit]("djinni") {
 
       def identStyle(optionName: String, update: IdentConverter => Unit) = {
@@ -117,6 +123,8 @@ object Main {
         .text("Java annotation (@Nullable) to place on all fields and return values that are optional")
       opt[String]("java-nonnull-annotation").valueName("<nonnull-annotation-class>").foreach(x => javaNonnullAnnotation = Some(x))
         .text("Java annotation (@Nonnull) to place on all fields and return values that are not optional")
+      opt[Boolean]("java-use-final-for-record").valueName("<use-final-for-record>").foreach(x => javaUseFinalForRecord = x)
+        .text("Whether generated Java classes for records should be marked 'final' (default: true). ")
       note("")
       opt[File]("cpp-out").valueName("<out-folder>").foreach(x => cppOutFolder = Some(x))
         .text("The output folder for C++ files (Generator disabled if unspecified).")
@@ -136,6 +144,12 @@ object Main {
         .text("The header to use for optional values (default: \"<optional>\")")
       opt[Boolean]("cpp-enum-hash-workaround").valueName("<true/false>").foreach(x => cppEnumHashWorkaround = x)
         .text("Work around LWG-2148 by generating std::hash specializations for C++ enums (default: true)")
+      opt[String]("cpp-nn-header").valueName("<header>").foreach(x => cppNnHeader = Some(x))
+        .text("The header to use for non-nullable pointers")
+      opt[String]("cpp-nn-type").valueName("<header>").foreach(x => cppNnType = Some(x))
+        .text("The type to use for non-nullable pointers (as a substitute for std::shared_ptr)")
+      opt[String]("cpp-nn-check-expression").valueName("<header>").foreach(x => cppNnCheckExpression = Some(x))
+        .text("The expression to use for building non-nullable pointers")
       note("")
       opt[File]("jni-out").valueName("<out-folder>").foreach(x => jniOutFolder = Some(x))
         .text("The folder for the JNI C++ output files (Generator disabled if unspecified).")
@@ -169,6 +183,10 @@ object Main {
         .text("The prefix for #include of the main C++ header files from Objective-C++ files.")
       opt[String]("objcpp-include-objc-prefix").valueName("<prefix>").foreach(x => objcppIncludeObjcPrefixOptional = Some(x))
         .text("The prefix for #import of the Objective-C header files from Objective-C++ files (default: the same as --objcpp-include-prefix)")
+      opt[String]("cpp-extended-record-include-prefix").valueName("<prefix>").foreach(cppExtendedRecordIncludePrefix = _)
+        .text("The prefix path for #include of the extended record C++ header (.hpp) files")
+      opt[String]("objc-extended-record-include-prefix").valueName("<prefix>").foreach(objcExtendedRecordIncludePrefix = _)
+        .text("The prefix path for #import of the extended record Objective-C header (.h) files")
       opt[String]("objcpp-namespace").valueName("<prefix>").foreach(objcppNamespace = _)
         .text("The namespace name to use for generated Objective-C++ classes.")
       opt[String]("objc-base-lib-include-prefix").valueName("...").foreach(x => objcBaseLibIncludePrefix = x)
@@ -322,15 +340,20 @@ object Main {
       javaAnnotation,
       javaNullableAnnotation,
       javaNonnullAnnotation,
+      javaUseFinalForRecord,
       cppOutFolder,
       cppHeaderOutFolder,
       cppIncludePrefix,
+      cppExtendedRecordIncludePrefix,
       cppNamespace,
       cppIdentStyle,
       cppFileIdentStyle,
       cppOptionalTemplate,
       cppOptionalHeader,
       cppEnumHashWorkaround,
+      cppNnHeader,
+      cppNnType,
+      cppNnCheckExpression,
       jniOutFolder,
       jniHeaderOutFolder,
       jniIncludePrefix,
@@ -348,6 +371,7 @@ object Main {
       objcppExt,
       objcHeaderExt,
       objcIncludePrefix,
+      objcExtendedRecordIncludePrefix,
       objcppIncludePrefix,
       objcppIncludeCppPrefix,
       objcppIncludeObjcPrefix,

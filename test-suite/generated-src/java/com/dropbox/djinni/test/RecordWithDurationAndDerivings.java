@@ -6,7 +6,7 @@ package com.dropbox.djinni.test;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
-public final class RecordWithDurationAndDerivings implements Comparable<RecordWithDurationAndDerivings> {
+public class RecordWithDurationAndDerivings implements Comparable<RecordWithDurationAndDerivings> {
 
 
     /*package*/ final java.time.Duration mDt;
@@ -37,6 +37,14 @@ public final class RecordWithDurationAndDerivings implements Comparable<RecordWi
         hashCode = hashCode * 31 + (mDt.hashCode());
         return hashCode;
     }
+
+    @Override
+    public String toString() {
+        return "RecordWithDurationAndDerivings{" +
+                "mDt=" + mDt +
+        "}";
+    }
+
 
     @Override
     public int compareTo(@Nonnull RecordWithDurationAndDerivings other)  {

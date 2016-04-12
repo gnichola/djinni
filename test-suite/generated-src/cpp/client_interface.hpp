@@ -3,12 +3,17 @@
 
 #pragma once
 
-#include "client_returned_record.hpp"
 #include <cstdint>
 #include <experimental/optional>
+#include <memory>
 #include <string>
 #include <vector>
 
+namespace testsuite {
+
+struct ClientReturnedRecord;
+
+/** Client interface */
 class ClientInterface {
 public:
     virtual ~ClientInterface() {}
@@ -19,4 +24,10 @@ public:
     virtual double identifier_check(const std::vector<uint8_t> & data, int32_t r, int64_t jret) = 0;
 
     virtual std::string return_str() = 0;
+
+    virtual std::string meth_taking_interface(const std::shared_ptr<ClientInterface> & i) = 0;
+
+    virtual std::string meth_taking_optional_interface(const std::shared_ptr<ClientInterface> & i) = 0;
 };
+
+}  // namespace testsuite

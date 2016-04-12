@@ -41,6 +41,10 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
 
     jniHpp.add("#include " + q(spec.jniIncludeCppPrefix + spec.cppFileIdentStyle(name) + "." + spec.cppHeaderExt))
     jniHpp.add("#include " + q(spec.jniBaseLibIncludePrefix + "djinni_support.hpp"))
+    spec.cppNnHeader match {
+      case Some(nnHdr) => jniHpp.add("#include " + nnHdr)
+      case _ =>
+    }
 
     def find(ty: TypeRef) { find(ty.resolved) }
     def find(tm: MExpr) {
@@ -131,7 +135,7 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         w.wl(s"const auto& data = ::djinni::JniClass<$jniHelper>::get();")
         val call = "auto r = ::djinni::LocalRef<JniType>{jniEnv->NewObject("
         w.w(call + "data.clazz.get(), data.jconstructor")
-        if(!r.fields.isEmpty) {
+        if(r.fields.nonEmpty) {
           w.wl(",")
           writeAlignedCall(w, " " * call.length(), r.fields, ")}", f => {
             val name = idCpp.field(f.ident)
@@ -167,11 +171,11 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
 
   override def generateInterface(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], i: Interface) {
     val refs = new JNIRefs(ident.name)
-    i.methods.map(m => {
-      m.params.map(p => refs.find(p.ty))
+    i.methods.foreach(m => {
+      m.params.foreach(p => refs.find(p.ty))
       m.ret.foreach(refs.find)
     })
-    i.consts.map(c => {
+    i.consts.foreach(c => {
       refs.find(c.ty)
     })
 
@@ -185,15 +189,31 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
       writeJniTypeParams(w, typeParams)
       w.w(s"class $jniSelf final : $baseType").bracedSemi {
         w.wlOutdent(s"public:")
-        w.wl(s"using CppType = std::shared_ptr<$cppSelf>;")
+        spec.cppNnType match {
+          case Some(nnPtr) =>
+            w.wl(s"using CppType = ${nnPtr}<$cppSelf>;")
+            w.wl(s"using CppOptType = std::shared_ptr<$cppSelf>;")
+          case _ =>
+            w.wl(s"using CppType = std::shared_ptr<$cppSelf>;")
+            w.wl(s"using CppOptType = std::shared_ptr<$cppSelf>;")
+        }
         w.wl(s"using JniType = jobject;")
         w.wl
         w.wl(s"using Boxed = $jniSelf;")
         w.wl
         w.wl(s"~$jniSelf();")
         w.wl
-        w.wl(s"static CppType toCpp(JNIEnv* jniEnv, JniType j) { return ::djinni::JniClass<$jniSelf>::get()._fromJava(jniEnv, j); }")
-        w.wl(s"static ::djinni::LocalRef<JniType> fromCpp(JNIEnv* jniEnv, const CppType& c) { return {jniEnv, ::djinni::JniClass<$jniSelf>::get()._toJava(jniEnv, c)}; }")
+        if (spec.cppNnType.nonEmpty) {
+          def nnCheck(expr: String): String = spec.cppNnCheckExpression.fold(expr)(check => s"$check($expr)")
+          w.w("static CppType toCpp(JNIEnv* jniEnv, JniType j)").bracedSemi {
+            w.wl(s"""DJINNI_ASSERT_MSG(j, jniEnv, "$jniSelf::fromCpp requires a non-null Java object");""")
+            w.wl(s"""return ${nnCheck(s"::djinni::JniClass<$jniSelf>::get()._fromJava(jniEnv, j)")};""")
+          }
+        } else {
+          w.wl(s"static CppType toCpp(JNIEnv* jniEnv, JniType j) { return ::djinni::JniClass<$jniSelf>::get()._fromJava(jniEnv, j); }")
+        }
+        w.wl(s"static ::djinni::LocalRef<JniType> fromCppOpt(JNIEnv* jniEnv, const CppOptType& c) { return {jniEnv, ::djinni::JniClass<$jniSelf>::get()._toJava(jniEnv, c)}; }")
+        w.wl(s"static ::djinni::LocalRef<JniType> fromCpp(JNIEnv* jniEnv, const CppType& c) { return fromCppOpt(jniEnv, c); }")
         w.wl
         w.wlOutdent("private:")
         w.wl(s"$jniSelf();")
@@ -201,9 +221,8 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         w.wl(s"friend $baseType;")
         w.wl
         if (i.ext.java) {
-          w.wl(s"class JavaProxy final : ::djinni::JavaProxyCacheEntry, public $cppSelf").bracedSemi {
+          w.wl(s"class JavaProxy final : ::djinni::JavaProxyHandle<JavaProxy>, public $cppSelf").bracedSemi {
             w.wlOutdent(s"public:")
-            // w.wl(s"using JavaProxyCacheEntry::JavaProxyCacheEntry;")
             w.wl(s"JavaProxy(JniType j);")
             w.wl(s"~JavaProxy();")
             w.wl
@@ -214,9 +233,7 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
             }
             w.wl
             w.wlOutdent(s"private:")
-            w.wl(s"using ::djinni::JavaProxyCacheEntry::getGlobalRef;")
             w.wl(s"friend ::djinni::JniInterface<$cppSelf, ${withNs(Some(spec.jniNamespace), jniSelf)}>;")
-            w.wl(s"friend ::djinni::JavaProxyCache<JavaProxy>;")
           }
           w.wl
           w.wl(s"const ::djinni::GlobalRef<jclass> clazz { ::djinni::jniFindClass(${q(classLookup)}) };")
@@ -241,7 +258,7 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
       w.wl
       if (i.ext.java) {
         writeJniTypeParams(w, typeParams)
-        w.wl(s"$jniSelfWithParams::JavaProxy::JavaProxy(JniType j) : JavaProxyCacheEntry(j) { }")
+        w.wl(s"$jniSelfWithParams::JavaProxy::JavaProxy(JniType j) : Handle(::djinni::jniGetThreadEnv(), j) { }")
         w.wl
         writeJniTypeParams(w, typeParams)
         w.wl(s"$jniSelfWithParams::JavaProxy::~JavaProxy() = default;")
@@ -250,15 +267,16 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
           val ret = cppMarshal.fqReturnType(m.ret)
           val params = m.params.map(p => cppMarshal.fqParamType(p.ty) + " c_" + idCpp.local(p.ident))
           writeJniTypeParams(w, typeParams)
-          w.w(s"$ret $jniSelfWithParams::JavaProxy::${idCpp.method(m.ident)}${params.mkString("(", ", ", ")")}").braced {
+          val methodNameAndSignature: String = s"${idCpp.method(m.ident)}${params.mkString("(", ", ", ")")}"
+          w.w(s"$ret $jniSelfWithParams::JavaProxy::$methodNameAndSignature").braced {
             w.wl(s"auto jniEnv = ::djinni::jniGetThreadEnv();")
             w.wl(s"::djinni::JniLocalScope jscope(jniEnv, 10);")
             w.wl(s"const auto& data = ::djinni::JniClass<${withNs(Some(spec.jniNamespace), jniSelf)}>::get();")
             val call = m.ret.fold("jniEnv->CallVoidMethod(")(r => "auto jret = " + toJniCall(r, (jt: String) => s"jniEnv->Call${jt}Method("))
             w.w(call)
             val javaMethodName = idJava.method(m.ident)
-            w.w(s"getGlobalRef(), data.method_$javaMethodName")
-            if(!m.params.isEmpty){
+            w.w(s"Handle::get().get(), data.method_$javaMethodName")
+            if(m.params.nonEmpty){
               w.wl(",")
               writeAlignedCall(w, " " * call.length(), m.params, ")", p => {
                 val param = jniMarshal.fromCpp(p.ty, "c_" + idCpp.local(p.ident))
@@ -269,7 +287,20 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
               w.w(")")
             w.wl(";")
             w.wl(s"::djinni::jniExceptionCheck(jniEnv);")
-            m.ret.fold()(r => w.wl(s"return ${jniMarshal.toCpp(r, "jret")};"))
+            m.ret.fold()(ty => {
+              (spec.cppNnCheckExpression, isInterface(ty.resolved)) match {
+                case (Some(check), true) => {
+                  // We have a non-optional interface, assert that we're getting a non-null value
+                  val javaParams = m.params.map(p => javaMarshal.fqParamType(p.ty) + " " + idJava.local(p.ident))
+                  val javaParamsString: String = javaParams.mkString("(", ",", ")")
+                  val functionString: String = s"${javaMarshal.fqTypename(ident, i)}#$javaMethodName$javaParamsString"
+                  w.wl(s"""DJINNI_ASSERT_MSG(jret, jniEnv, "Got unexpected null return value from function $functionString");""")
+                  w.wl(s"return ${jniMarshal.toCpp(ty, "jret")};")
+                }
+                case _ =>
+              }
+              w.wl(s"return ${jniMarshal.toCpp(ty, "jret")};")
+            })
           }
         }
       }
@@ -309,7 +340,18 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
           val nativeAddon = if (m.static) "" else "native_"
           nativeHook(nativeAddon + idJava.method(m.ident), m.static, m.params, m.ret, {
             //w.wl(s"::${spec.jniNamespace}::JniLocalScope jscope(jniEnv, 10);")
-            if (!m.static) w.wl(s"const auto& ref = ::djinni::CppProxyHandle<$cppSelf>::get(nativeRef);")
+            if (!m.static) w.wl(s"const auto& ref = ::djinni::objectFromHandleAddress<$cppSelf>(nativeRef);")
+            m.params.foreach(p => {
+              if (isInterface(p.ty.resolved) && spec.cppNnCheckExpression.nonEmpty) {
+                // We have a non-optional interface in nn mode, assert that we're getting a non-null value
+                val paramName = idJava.local(p.ident)
+                val javaMethodName = idJava.method(m.ident)
+                val javaParams = m.params.map(p => javaMarshal.fqParamType(p.ty) + " " + idJava.local(p.ident))
+                val javaParamsString: String = javaParams.mkString("(", ", ", ")")
+                val functionString: String = s"${javaMarshal.fqTypename(ident, i)}#$javaMethodName$javaParamsString"
+                w.wl( s"""DJINNI_ASSERT_MSG(j_$paramName, jniEnv, "Got unexpected null parameter '$paramName' to function $functionString");""")
+              }
+            })
             val methodName = idCpp.method(m.ident)
             val ret = m.ret.fold("")(r => "auto r = ")
             val call = if (m.static) s"$cppSelf::$methodName(" else s"ref->$methodName("

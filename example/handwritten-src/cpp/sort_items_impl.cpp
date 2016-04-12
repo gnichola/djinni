@@ -1,6 +1,10 @@
-#include "sort_items_impl.hpp"
 #include <algorithm>
 #include <random>
+
+#include "item_list.hpp"
+#include "sort_order.hpp"
+
+#include "sort_items_impl.hpp"
 
 namespace textsort {
 
@@ -31,6 +35,12 @@ void SortItemsImpl::sort(sort_order order, const ItemList & items) {
 
     // Pass result to client interface
     this->m_listener->update(ItemList(lines));
+}
+
+ItemList SortItems::run_sort(const ItemList & items) {
+    auto lines = items.items;
+    std::sort(lines.begin(), lines.end(), std::less<std::string>());
+    return ItemList(lines);
 }
 
 }

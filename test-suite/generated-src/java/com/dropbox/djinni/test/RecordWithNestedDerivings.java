@@ -6,7 +6,7 @@ package com.dropbox.djinni.test;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
-public final class RecordWithNestedDerivings implements Comparable<RecordWithNestedDerivings> {
+public class RecordWithNestedDerivings implements Comparable<RecordWithNestedDerivings> {
 
 
     /*package*/ final int mKey;
@@ -47,6 +47,15 @@ public final class RecordWithNestedDerivings implements Comparable<RecordWithNes
         hashCode = hashCode * 31 + mRec.hashCode();
         return hashCode;
     }
+
+    @Override
+    public String toString() {
+        return "RecordWithNestedDerivings{" +
+                "mKey=" + mKey +
+                "," + "mRec=" + mRec +
+        "}";
+    }
+
 
     @Override
     public int compareTo(@Nonnull RecordWithNestedDerivings other)  {

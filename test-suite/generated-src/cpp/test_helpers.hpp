@@ -3,12 +3,6 @@
 
 #pragma once
 
-#include "assorted_primitives.hpp"
-#include "color.hpp"
-#include "map_list_record.hpp"
-#include "nested_collection.hpp"
-#include "primitive_list.hpp"
-#include "set_record.hpp"
 #include <cstdint>
 #include <experimental/optional>
 #include <memory>
@@ -16,15 +10,34 @@
 #include <unordered_map>
 #include <vector>
 
-class ClientInterface;
-class Token;
+namespace testsuite {
 
+class ClientInterface;
+class UserToken;
+enum class color;
+struct AssortedPrimitives;
+struct MapListRecord;
+struct NestedCollection;
+struct PrimitiveList;
+struct SetRecord;
+
+/**
+ * Helper methods used by various different tests.
+ * (Second line of multi-line documentation.
+ *   Indented third line of multi-line documentation.)
+ */
 class TestHelpers {
 public:
     virtual ~TestHelpers() {}
 
+    /** Method with documentation */
     static SetRecord get_set_record();
 
+    /**
+     * Method with long documentation
+     * (Second line of multi-line documentation.
+     *   Indented third line of multi-line documentation.)
+     */
     static bool check_set_record(const SetRecord & rec);
 
     static PrimitiveList get_primitive_list();
@@ -51,19 +64,21 @@ public:
 
     static void check_client_interface_nonascii(const std::shared_ptr<ClientInterface> & i);
 
+    static void check_client_interface_args(const std::shared_ptr<ClientInterface> & i);
+
     static void check_enum_map(const std::unordered_map<color, std::string> & m);
 
     static void check_enum(color c);
 
-    static std::shared_ptr<Token> token_id(const std::shared_ptr<Token> & t);
+    static std::shared_ptr<UserToken> token_id(const std::shared_ptr<UserToken> & t);
 
-    static std::shared_ptr<Token> create_cpp_token();
+    static std::shared_ptr<UserToken> create_cpp_token();
 
-    static void check_cpp_token(const std::shared_ptr<Token> & t);
+    static void check_cpp_token(const std::shared_ptr<UserToken> & t);
 
-    static int64_t cpp_token_id(const std::shared_ptr<Token> & t);
+    static int64_t cpp_token_id(const std::shared_ptr<UserToken> & t);
 
-    static void check_token_type(const std::shared_ptr<Token> & t, const std::string & type);
+    static void check_token_type(const std::shared_ptr<UserToken> & t, const std::string & type);
 
     static std::experimental::optional<int32_t> return_none();
 
@@ -72,3 +87,5 @@ public:
 
     static std::vector<uint8_t> id_binary(const std::vector<uint8_t> & b);
 };
+
+}  // namespace testsuite

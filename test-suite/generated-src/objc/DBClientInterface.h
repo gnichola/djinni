@@ -3,8 +3,10 @@
 
 #import "DBClientReturnedRecord.h"
 #import <Foundation/Foundation.h>
+@protocol DBClientInterface;
 
 
+/** Client interface */
 @protocol DBClientInterface
 
 /** Returns record of given string */
@@ -17,5 +19,9 @@
                      jret:(int64_t)jret;
 
 - (nonnull NSString *)returnStr;
+
+- (nonnull NSString *)methTakingInterface:(nullable id<DBClientInterface>)i;
+
+- (nonnull NSString *)methTakingOptionalInterface:(nullable id<DBClientInterface>)i;
 
 @end

@@ -3,10 +3,11 @@
 
 #include "NativeConstantsInterface.hpp"  // my header
 #include "Marshal.hpp"
+#include "NativeConstantRecord.hpp"
 
 namespace djinni_generated {
 
-NativeConstantsInterface::NativeConstantsInterface() : ::djinni::JniInterface<::ConstantsInterface, NativeConstantsInterface>("com/dropbox/djinni/test/ConstantsInterface$CppProxy") {}
+NativeConstantsInterface::NativeConstantsInterface() : ::djinni::JniInterface<::testsuite::ConstantsInterface, NativeConstantsInterface>("com/dropbox/djinni/test/ConstantsInterface$CppProxy") {}
 
 NativeConstantsInterface::~NativeConstantsInterface() = default;
 
@@ -15,7 +16,7 @@ CJNIEXPORT void JNICALL Java_com_dropbox_djinni_test_ConstantsInterface_00024Cpp
 {
     try {
         DJINNI_FUNCTION_PROLOGUE1(jniEnv, nativeRef);
-        delete reinterpret_cast<djinni::CppProxyHandle<::ConstantsInterface>*>(nativeRef);
+        delete reinterpret_cast<djinni::CppProxyHandle<::testsuite::ConstantsInterface>*>(nativeRef);
     } JNI_TRANSLATE_EXCEPTIONS_RETURN(jniEnv, )
 }
 
@@ -23,7 +24,7 @@ CJNIEXPORT void JNICALL Java_com_dropbox_djinni_test_ConstantsInterface_00024Cpp
 {
     try {
         DJINNI_FUNCTION_PROLOGUE1(jniEnv, nativeRef);
-        const auto& ref = ::djinni::CppProxyHandle<::ConstantsInterface>::get(nativeRef);
+        const auto& ref = ::djinni::objectFromHandleAddress<::testsuite::ConstantsInterface>(nativeRef);
         ref->dummy();
     } JNI_TRANSLATE_EXCEPTIONS_RETURN(jniEnv, )
 }

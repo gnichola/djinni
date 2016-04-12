@@ -44,4 +44,9 @@
     return NSOrderedSame;
 }
 
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"<%@ %p createdAt:%@>", self.class, (void *)self, self.createdAt];
+}
+
 @end

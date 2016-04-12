@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
-public final class PrimitiveList {
+public class PrimitiveList {
 
 
     /*package*/ final ArrayList<Long> mList;
@@ -21,4 +21,12 @@ public final class PrimitiveList {
     public ArrayList<Long> getList() {
         return mList;
     }
+
+    @Override
+    public String toString() {
+        return "PrimitiveList{" +
+                "mList=" + mList +
+        "}";
+    }
+
 }

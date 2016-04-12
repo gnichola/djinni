@@ -8,7 +8,7 @@ import java.util.HashMap;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
-public final class MapListRecord {
+public class MapListRecord {
 
 
     /*package*/ final ArrayList<HashMap<String, Long>> mMapList;
@@ -22,4 +22,12 @@ public final class MapListRecord {
     public ArrayList<HashMap<String, Long>> getMapList() {
         return mMapList;
     }
+
+    @Override
+    public String toString() {
+        return "MapListRecord{" +
+                "mMapList=" + mMapList +
+        "}";
+    }
+
 }

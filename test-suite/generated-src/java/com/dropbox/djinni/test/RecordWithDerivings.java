@@ -6,7 +6,7 @@ package com.dropbox.djinni.test;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
-public final class RecordWithDerivings implements Comparable<RecordWithDerivings> {
+public class RecordWithDerivings implements Comparable<RecordWithDerivings> {
 
 
     /*package*/ final int mKey1;
@@ -47,6 +47,15 @@ public final class RecordWithDerivings implements Comparable<RecordWithDerivings
         hashCode = hashCode * 31 + mKey2.hashCode();
         return hashCode;
     }
+
+    @Override
+    public String toString() {
+        return "RecordWithDerivings{" +
+                "mKey1=" + mKey1 +
+                "," + "mKey2=" + mKey2 +
+        "}";
+    }
+
 
     @Override
     public int compareTo(@Nonnull RecordWithDerivings other)  {

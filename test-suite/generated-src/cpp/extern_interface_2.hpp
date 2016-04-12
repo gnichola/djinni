@@ -3,13 +3,14 @@
 
 #pragma once
 
-#include "extern_record_with_derivings.hpp"
 #include "test_helpers.hpp"
 #include <memory>
+
+struct ExternRecordWithDerivings;
 
 class ExternInterface2 {
 public:
     virtual ~ExternInterface2() {}
 
-    virtual ExternRecordWithDerivings foo(const std::shared_ptr<::TestHelpers> & i) = 0;
+    virtual ExternRecordWithDerivings foo(const std::shared_ptr<::testsuite::TestHelpers> & i) = 0;
 };

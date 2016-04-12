@@ -35,15 +35,20 @@ package object generatorTools {
                    javaAnnotation: Option[String],
                    javaNullableAnnotation: Option[String],
                    javaNonnullAnnotation: Option[String],
+                   javaUseFinalForRecord: Boolean,
                    cppOutFolder: Option[File],
                    cppHeaderOutFolder: Option[File],
                    cppIncludePrefix: String,
+                   cppExtendedRecordIncludePrefix: String,
                    cppNamespace: String,
                    cppIdentStyle: CppIdentStyle,
                    cppFileIdentStyle: IdentConverter,
                    cppOptionalTemplate: String,
                    cppOptionalHeader: String,
                    cppEnumHashWorkaround: Boolean,
+                   cppNnHeader: Option[String],
+                   cppNnType: Option[String],
+                   cppNnCheckExpression: Option[String],
                    jniOutFolder: Option[File],
                    jniHeaderOutFolder: Option[File],
                    jniIncludePrefix: String,
@@ -61,6 +66,7 @@ package object generatorTools {
                    objcppExt: String,
                    objcHeaderExt: String,
                    objcIncludePrefix: String,
+                   objcExtendedRecordIncludePrefix: String,
                    objcppIncludePrefix: String,
                    objcppIncludeCppPrefix: String,
                    objcppIncludeObjcPrefix: String,
@@ -231,8 +237,8 @@ package object generatorTools {
       if (spec.yamlOutFolder.isDefined) {
         if (!spec.skipGeneration) {
           createFolder("YAML", spec.yamlOutFolder.get)
-          new YamlGenerator(spec).generate(idl)
         }
+        new YamlGenerator(spec).generate(idl)
       }
       None
     }
@@ -282,7 +288,7 @@ abstract class Generator(spec: Spec)
   }
 
   protected def createFile(folder: File, fileName: String, f: IndentWriter => Unit): Unit = createFile(folder, fileName, out => new IndentWriter(out), f)
-  
+
   implicit def identToString(ident: Ident): String = ident.name
   val idCpp = spec.cppIdentStyle
   val idJava = spec.javaIdentStyle
@@ -368,6 +374,8 @@ abstract class Generator(spec: Spec)
       case Some("") => "::" + t
       case Some(s) => "::" + s + "::" + t
     }
+
+  def withCppNs(t: String) = withNs(Some(spec.cppNamespace), t)
 
   def writeAlignedCall(w: IndentWriter, call: String, params: Seq[Field], delim: String, end: String, f: Field => String): IndentWriter = {
     w.w(call)
