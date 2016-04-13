@@ -10,7 +10,7 @@ namespace textsort {
 enum class sort_order : int {
     ASCENDING,
     DESCENDING,
-    RANDOM,
+    RANDOM
 };
 
 }  // namespace textsort
